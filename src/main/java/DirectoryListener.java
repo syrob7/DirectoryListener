@@ -10,11 +10,13 @@ import java.util.GregorianCalendar;
 
 public class DirectoryListener implements Runnable {
 
+    public static final String WATCH_DIRECTORY_SERVICE = "c:\\Demo\\Home\\";
+    public static final String DIRECTORY_DEV = "c:\\Demo\\Dev\\";
+    public static final String DIRECTORY_TEST = "c:\\Demo\\Test\\";
     private static Path directoryPath;
 
     public static void main(String[] args) {
-
-        directoryPath = FileSystems.getDefault().getPath("c:\\Demo\\Home\\");
+        directoryPath = FileSystems.getDefault().getPath(WATCH_DIRECTORY_SERVICE);
         Thread thread = new Thread(new DirectoryListener());
         thread.start();
     }
@@ -54,17 +56,17 @@ public class DirectoryListener implements Runnable {
     }
 
     private void createDirectory() {
-        File srcFolderHome = new File("c:\\Demo\\Home");
+        File srcFolderHome = new File(WATCH_DIRECTORY_SERVICE);
         if (!srcFolderHome.exists()) {
             srcFolderHome.mkdirs();
         }
 
-        File srcFolderDev = new File("c:\\Demo\\Dev");
+        File srcFolderDev = new File(DIRECTORY_DEV);
         if (!srcFolderDev.exists()) {
             srcFolderDev.mkdirs();
         }
 
-        File srcFolderTest = new File("c:\\Demo\\Test");
+        File srcFolderTest = new File(DIRECTORY_TEST);
         if(!srcFolderTest.exists()) {
             srcFolderTest.mkdirs();
         }
@@ -74,45 +76,48 @@ public class DirectoryListener implements Runnable {
         WatchEvent.Kind<?> kind = event.kind();
 
         if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) {
-            Path fileCreated = (Path) event.context();
+            Path file = (Path) event.context();
+            String fileCreated = directoryPath.toAbsolutePath().toString()
+                    + "\\" + file.getFileName().toString();
+            System.out.println("New entry created: " + fileCreated);
+
             try {
-                BasicFileAttributes attr = Files.readAttributes(fileCreated, BasicFileAttributes.class);
-                moveFile(attr.creationTime(), fileCreated);
+                Thread.sleep(500);
+                BasicFileAttributes attr = Files.readAttributes(Paths.get(fileCreated), BasicFileAttributes.class);
+                moveFile(attr.creationTime(), file.getFileName().toString());
             } catch (IOException ex) {
                 System.out.println("Can't read file attributes:" + fileCreated);
                 ex.printStackTrace();
-            }
+            } catch (InterruptedException ex) {
 
-            System.out.println("New entry created:" + fileCreated);
+            }
         }
     }
 
-    private void moveFile(FileTime fileTime, Path file) throws IOException {
+    private void moveFile(FileTime fileTime, String file) throws IOException {
         Date fileDate = new Date( fileTime.toMillis() );
         Calendar calendar = GregorianCalendar.getInstance();
         calendar.setTime(fileDate);
 
         int fileCreatedHour = calendar.get(Calendar.HOUR_OF_DAY);
 
-        if (fileCreatedHour%2 == 0 && file.getFileName().toString().endsWith(".jar")) {
+        String src = WATCH_DIRECTORY_SERVICE + file;
+        if (fileCreatedHour%2 == 0 && file.endsWith(".jar")) {
             System.out.println("move to dev");
 
-            String src = "c:\\Demo\\Home\\" + file.getFileName();
-            String dest = "c:\\Demo\\Dev\\" + file.getFileName();
+            String dest = DIRECTORY_DEV + file;
 
             Files.move(Paths.get(src),Paths.get(dest));
-        } else if (fileCreatedHour%2 != 0 && file.getFileName().toString().endsWith(".jar")) {
+        } else if (fileCreatedHour%2 != 0 && file.endsWith(".jar")) {
             System.out.println("move to test");
 
-            String src = "c:\\Demo\\Home\\" + file.getFileName();
-            String dest = "c:\\Demo\\Test\\" + file.getFileName();
+            String dest = DIRECTORY_TEST + file;
 
             Files.move(Paths.get(src),Paths.get(dest));
-        } else if (file.getFileName().toString().endsWith("xml")) {
+        } else if (file.endsWith(".xml")) {
             System.out.println("move to dev");
 
-            String src = "c:\\Demo\\Home\\" + file.getFileName();
-            String dest = "c:\\Demo\\Dev\\" + file.getFileName();
+            String dest = DIRECTORY_DEV + file;
 
             Files.move(Paths.get(src),Paths.get(dest));
         }
