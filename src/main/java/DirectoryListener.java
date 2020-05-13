@@ -1,23 +1,30 @@
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Properties;
 
 public class DirectoryListener implements Runnable {
 
-    public static final String WATCH_DIRECTORY_SERVICE = "c:\\Demo\\Home\\";
-    public static final String DIRECTORY_DEV = "c:\\Demo\\Dev\\";
-    public static final String DIRECTORY_TEST = "c:\\Demo\\Test\\";
+    private static String WATCH_DIRECTORY_SERVICE;
+    private static String DIRECTORY_DEV;
+    private static String DIRECTORY_TEST;
     private static Path directoryPath;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        DirectoryListener directoryListener = new DirectoryListener();
+
+        directoryListener.loadProperies();
         directoryPath = FileSystems.getDefault().getPath(WATCH_DIRECTORY_SERVICE);
-        Thread thread = new Thread(new DirectoryListener());
+        Thread thread = new Thread(directoryListener);
+
         thread.start();
     }
 
@@ -95,11 +102,7 @@ public class DirectoryListener implements Runnable {
     }
 
     private void moveFile(FileTime fileTime, String file) throws IOException {
-        Date fileDate = new Date( fileTime.toMillis() );
-        Calendar calendar = GregorianCalendar.getInstance();
-        calendar.setTime(fileDate);
-
-        int fileCreatedHour = calendar.get(Calendar.HOUR_OF_DAY);
+        int fileCreatedHour = getFileCreatedHour(fileTime);
 
         String src = WATCH_DIRECTORY_SERVICE + file;
         if (fileCreatedHour%2 == 0 && file.endsWith(".jar")) {
@@ -121,5 +124,27 @@ public class DirectoryListener implements Runnable {
 
             Files.move(Paths.get(src),Paths.get(dest));
         }
+    }
+
+    private int getFileCreatedHour(FileTime fileTime) {
+        Date fileDate = new Date( fileTime.toMillis() );
+        Calendar calendar = GregorianCalendar.getInstance();
+        calendar.setTime(fileDate);
+
+        return calendar.get(Calendar.HOUR_OF_DAY);
+    }
+
+    private void loadProperies() throws IOException {
+        InputStream input = getClass().getClassLoader().getResourceAsStream("config.properties");
+
+        Properties prop = new Properties();
+
+        // load a properties file
+        prop.load(input);
+
+        // get the property value and print it out
+        WATCH_DIRECTORY_SERVICE = prop.getProperty("dir.home");
+        DIRECTORY_DEV = prop.getProperty("dir.dev");
+        DIRECTORY_TEST = prop.getProperty("dir.test");
     }
 }
