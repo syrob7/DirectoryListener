@@ -1,15 +1,12 @@
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.FileChannel;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.Properties;
+import java.util.*;
 
 public class DirectoryListener implements Runnable {
 
@@ -17,6 +14,15 @@ public class DirectoryListener implements Runnable {
     private static String DIRECTORY_DEV;
     private static String DIRECTORY_TEST;
     private static Path directoryPath;
+
+    private Map<String, Integer> log;
+
+    public DirectoryListener() {
+        log = new HashMap<>();
+        log.put("all", 0);
+        log.put("dev", 0);
+        log.put("test", 0);
+    }
 
     public static void main(String[] args) throws IOException {
         DirectoryListener directoryListener = new DirectoryListener();
@@ -31,7 +37,7 @@ public class DirectoryListener implements Runnable {
     public void run() {
         try {
             System.out.println("Program is running .....");
-            createDirectory();
+            createDirectoryAndLogFile();
 
             WatchService watchService = directoryPath.getFileSystem().newWatchService();
             directoryPath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE);
@@ -62,7 +68,7 @@ public class DirectoryListener implements Runnable {
         }
     }
 
-    private void createDirectory() {
+    private void createDirectoryAndLogFile() {
         File srcFolderHome = new File(WATCH_DIRECTORY_SERVICE);
         if (!srcFolderHome.exists()) {
             srcFolderHome.mkdirs();
@@ -76,6 +82,22 @@ public class DirectoryListener implements Runnable {
         File srcFolderTest = new File(DIRECTORY_TEST);
         if(!srcFolderTest.exists()) {
             srcFolderTest.mkdirs();
+        }
+
+        createFile();
+    }
+
+    private void createFile() {
+        try {
+            File myObj = new File(WATCH_DIRECTORY_SERVICE + "log.txt");
+            if (myObj.createNewFile()) {
+                System.out.println("File created: " + myObj.getName());
+            } else {
+                System.out.println("File already exists.");
+            }
+        } catch (IOException e) {
+            System.out.println("An error occurred.");
+            e.printStackTrace();
         }
     }
 
@@ -105,25 +127,43 @@ public class DirectoryListener implements Runnable {
         int fileCreatedHour = getFileCreatedHour(fileTime);
 
         String src = WATCH_DIRECTORY_SERVICE + file;
+        log.put("all", log.get("all").intValue() + 1);
         if (fileCreatedHour%2 == 0 && file.endsWith(".jar")) {
             System.out.println("move to dev");
-
+            log.put("dev", log.get("dev").intValue() + 1);
+            
             String dest = DIRECTORY_DEV + file;
 
             Files.move(Paths.get(src),Paths.get(dest));
         } else if (fileCreatedHour%2 != 0 && file.endsWith(".jar")) {
             System.out.println("move to test");
+            log.put("test", log.get("test").intValue() + 1);
 
             String dest = DIRECTORY_TEST + file;
 
             Files.move(Paths.get(src),Paths.get(dest));
         } else if (file.endsWith(".xml")) {
             System.out.println("move to dev");
-
+            log.put("dev", log.get("dev").intValue() + 1);
+            
             String dest = DIRECTORY_DEV + file;
 
             Files.move(Paths.get(src),Paths.get(dest));
         }
+        writeToLogFile();
+    }
+
+    private void writeToLogFile() throws IOException {
+        Path pathLogFile = Paths.get(WATCH_DIRECTORY_SERVICE + "log.txt");
+        FileChannel.open(pathLogFile, StandardOpenOption.WRITE).truncate(0).close();
+
+        StringBuilder builder = new StringBuilder();
+        for(String key: log.keySet()) {
+            builder.append(key + ": " + log.get(key).intValue() + "\n");
+        }
+
+        byte[] strToBytes = builder.toString().getBytes();
+        Files.write(pathLogFile, strToBytes);
     }
 
     private int getFileCreatedHour(FileTime fileTime) {
